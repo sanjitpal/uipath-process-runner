@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la \"F:\\\\YoutubeVideos\\\\RunUiPathProcessFromExternalApp\\\\uipath-react-app\" 2>/dev/null && echo \"---PARENT---\" && ls -la \"F:\\\\YoutubeVideos\\\\RunUiPathProcessFromExternalApp\" 2>/dev/null)",
+      "WebSearch",
+      "Bash(npm run *)",
+      "Bash(node server.js)",
+      "Bash(curl -s http://localhost:3001/api/health)",
+      "Bash(curl -s http://localhost:3001/api/uipath/processes)",
+      "Bash(curl -s http://localhost:3001/api/uipath/jobs/active)",
+      "Bash(curl -s http://localhost:3001/api/uipath/jobs/completed-today)",
+      "WebFetch(domain:docs.uipath.com)",
+      "WebFetch(domain:cloud.uipath.com)",
+      "Bash(npm install *)",
+      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(32\\).toString\\('hex'\\)\\)\")",
+      "Bash(node --check server.js)",
+      "Bash(node --check auth.js)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //PID 26116 //F)",
+      "Bash(curl -s -w \"\\\\n[HTTP %{http_code}]\\\\n\" http://localhost:3001/api/health)",
+      "Bash(curl -is http://localhost:3001/auth/me)",
+      "Bash(curl -is http://localhost:3001/api/uipath/processes)",
+      "Bash(curl -is \"http://localhost:3001/auth/callback?state=bad&code=x\")",
+      "Bash(curl -is http://localhost:5173/auth/login)",
+      "Bash(curl -is http://localhost:5173/api/uipath/processes)"
+    ]
+  }
+}
