@@ -1,7 +1,5 @@
 import axios from 'axios';
 
-// Same-origin (proxied by Vite to the backend). withCredentials so the session
-// cookie rides along on every request.
 const api = axios.create({ baseURL: '', withCredentials: true });
 
 // Who is logged in? Returns { authenticated, user, org, tenant }.

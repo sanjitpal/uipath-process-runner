@@ -74,6 +74,23 @@ const postToken = async (params) => {
   return data;
 };
 
+// Fetch user info from the standard OIDC UserInfo endpoint
+const getUserInfo = async (accessToken) => {
+  try {
+    const userInfoUrl = `${IDENTITY_BASE}/connect/userinfo`;
+    const { data } = await axios.get(userInfoUrl, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json',
+      },
+    });
+    return data;
+  } catch (err) {
+    console.warn('⚠️  Could not fetch UserInfo:', err.response?.data || err.message);
+    return {};
+  }
+};
+
 const saveSession = (req) =>
   new Promise((resolve, reject) =>
     req.session.save((err) => (err ? reject(err) : resolve()))
@@ -210,20 +227,18 @@ authRouter.get('/callback', async (req, res) => {
       code_verifier: saved.codeVerifier,
     });
 
-    const claims = data.id_token ? decodeJwt(data.id_token) : {};
+    const idClaims = data.id_token ? decodeJwt(data.id_token) : {};
+
+    // Fetch additional user info from UserInfo endpoint using access token
+    const userInfo = await getUserInfo(data.access_token);
+
     const user = {
       name:
-        claims.name ||
-        claims.preferred_username ||
-        claims.email ||
-        claims.sub ||
-        'UiPath user',
-      email: claims.email || null,
-      sub: claims.sub || null,
+      userInfo.first_name,
+      email: userInfo.email || idClaims.email || null,
+      sub: idClaims.sub || null,
     };
 
-    // Session fixation defence: regenerate (new id) AFTER reading the handshake
-    // data, then store the tokens on the fresh session.
     await new Promise((resolve, reject) =>
       req.session.regenerate((err) => (err ? reject(err) : resolve()))
     );
