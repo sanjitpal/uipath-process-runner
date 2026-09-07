@@ -27,6 +27,46 @@ export const startUiPathJob = async (releaseKey, folderId) => {
   return data;
 };
 
+// Start a job with input arguments for the FullName form.
+export const startJobWithArgs = async (releaseKey, folderId, inputArgs) => {
+  const { data } = await api.post(
+    '/api/uipath/start-job-with-args',
+    { releaseKey, inputArgs },
+    withFolder(folderId)
+  );
+  return data;
+};
+
+// Poll for job completion and return output arguments.
+export const pollForJobResult = async (jobId, folderId, pollInterval = 2000, maxWait = 60000) => {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < maxWait) {
+    const { data } = await api.get(`/api/uipath/jobs/${jobId}`, withFolder(folderId));
+    const job = data;
+
+    if (job.State === 'Successful' || job.State === 'Stopped' || job.State === 'Faulted') {
+      // Parse output arguments
+      if (job.OutputArguments) {
+        try {
+          const args = typeof job.OutputArguments === 'string'
+            ? JSON.parse(job.OutputArguments)
+            : job.OutputArguments;
+          return args || {};
+        } catch {
+          return {};
+        }
+      }
+      return {};
+    }
+
+    // Wait before polling again
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
+  }
+
+  throw new Error('Job did not complete within the expected time');
+};
+
 // Section 2: running + pending jobs in the selected folder.
 export const getActiveJobs = async (folderId) => {
   const { data } = await api.get('/api/uipath/jobs/active', withFolder(folderId));

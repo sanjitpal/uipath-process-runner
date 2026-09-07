@@ -150,6 +150,46 @@ app.post('/api/uipath/stop-job/:jobId', requireAuth, async (req, res) => {
   }
 });
 
+// --- Start a job with input arguments --------------------------------------
+app.post('/api/uipath/start-job-with-args', requireAuth, async (req, res) => {
+  try {
+    const { releaseKey, inputArgs } = req.body;
+    if (!releaseKey) {
+      return res.status(400).json({ error: 'releaseKey is required' });
+    }
+
+    const url = `${VITE_UIPATH_TENANT_URL}/odata/Jobs/UiPath.Server.Configuration.OData.StartJobs`;
+    const { data } = await orchestrator(req, {
+      method: 'post',
+      url,
+      data: {
+        startInfo: {
+          ReleaseKey: releaseKey,
+          Strategy: 'ModernJobsCount',
+          JobsCount: 1,
+          RuntimeType: 'Unattended',
+          InputArguments: inputArgs ? JSON.stringify(inputArgs) : null,
+        },
+      },
+    });
+    res.json(data);
+  } catch (error) {
+    sendError(res, error, 'Failed to start job with arguments');
+  }
+});
+
+// --- Get a specific job by ID (for polling) --------------------------------
+app.get('/api/uipath/jobs/:jobId', requireAuth, async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const url = `${VITE_UIPATH_TENANT_URL}/odata/Jobs(${jobId})?$select=Id,State,StartTime,EndTime,OutputArguments`;
+    const { data } = await orchestrator(req, { method: 'get', url });
+    res.json(data);
+  } catch (error) {
+    sendError(res, error, 'Failed to fetch job');
+  }
+});
+
 app.get('/api/health', (_req, res) =>
   res.json({ ok: true, org: authConfig.org, tenant: authConfig.tenant, scope: authConfig.SCOPE })
 );

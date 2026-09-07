@@ -9,7 +9,9 @@ import {
 } from './services/uiPathApi';
 import { getMe, logout } from './services/authApi';
 import LoginScreen from './components/LoginScreen';
+import FullNameForm from './components/FullNameForm';
 import './App.css';
+
 
 const POLL_INTERVAL = 5000;
 
@@ -156,6 +158,9 @@ function App() {
   const [loadingProcesses, setLoadingProcesses] = useState(true);
   const [processesError, setProcessesError] = useState(null);
   const [startingKey, setStartingKey] = useState(null);
+
+    // FullName form state
+  const [selectedProcessKey, setSelectedProcessKey] = useState('');
 
   const [activeJobs, setActiveJobs] = useState([]);
   const [completedJobs, setCompletedJobs] = useState([]);
@@ -471,6 +476,35 @@ function App() {
             ))}
           </div>
         )}
+      </section>
+
+      
+      {/* Section 4: FullName Form ------------------------------------------- */}
+      <section className="panel">
+        <FullNameForm
+          releaseKey={selectedProcessKey}
+          folderId={selectedFolderId}
+        />
+
+        <div className="form-process-selector">
+          <label htmlFor="processSelect">Select Process (Release Key):</label>
+          <select
+            id="processSelect"
+            value={selectedProcessKey}
+            onChange={(e) => setSelectedProcessKey(e.target.value)}
+            disabled={processes.length === 0}
+          >
+            <option value="">-- Select a process --</option>
+            {processes.map((proc) => (
+              <option key={proc.Key} value={proc.Key}>
+                {proc.Name} ({proc.Key})
+              </option>
+            ))}
+          </select>
+          {processes.length === 0 && (
+            <p className="muted">No processes available. Select a folder with processes.</p>
+          )}
+        </div>
       </section>
 
       <footer className="app-footer">
