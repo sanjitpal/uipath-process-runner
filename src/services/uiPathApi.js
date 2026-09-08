@@ -4,6 +4,17 @@ import axios from 'axios';
 // session cookie so the backend can act as the logged-in user.
 const api = axios.create({ baseURL: '', withCredentials: true });
 
+// Attach Authorization header if stored
+api.interceptors.request.use((config) => {
+  try {
+    const token = localStorage.getItem('uipath_auth_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch {}
+  return config;
+});
+
 // folderId scopes every Orchestrator call to the folder the user picked. Sent
 // as a query param on all requests (incl. POSTs) so the backend can read it
 // uniformly from req.query.
@@ -38,7 +49,7 @@ export const startJobWithArgs = async (releaseKey, folderId, inputArgs) => {
 };
 
 // Poll for job completion and return output arguments.
-export const pollForJobResult = async (jobId, folderId, pollInterval = 2000, maxWait = 60000) => {
+export const pollForJobResult = async (jobId, folderId, pollInterval = 2000, maxWait = 90000) => {
   const startTime = Date.now();
 
   while (Date.now() - startTime < maxWait) {
@@ -46,6 +57,13 @@ export const pollForJobResult = async (jobId, folderId, pollInterval = 2000, max
     const job = data;
 
     if (job.State === 'Successful' || job.State === 'Stopped' || job.State === 'Faulted') {
+      if (job.State === 'Faulted') {
+        throw new Error(job.Info || 'Job faulted in UiPath Orchestrator.');
+      }
+      if (job.State === 'Stopped') {
+        throw new Error(job.Info || 'Job was terminated or stopped in UiPath.');
+      }
+
       // Parse output arguments
       if (job.OutputArguments) {
         try {
@@ -64,7 +82,7 @@ export const pollForJobResult = async (jobId, folderId, pollInterval = 2000, max
     await new Promise(resolve => setTimeout(resolve, pollInterval));
   }
 
-  throw new Error('Job did not complete within the expected time');
+  throw new Error('Job did not complete within the expected time limit.');
 };
 
 // Section 2: running + pending jobs in the selected folder.

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # UiPath Process Runner (React + Express)
 
 A small React app where each user **logs in with their own UiPath account** and
@@ -85,9 +84,4 @@ Start the React dev server (terminal 2):
 npm run dev
 ```
 
-Open http://localhost:5173 and click **Login with UiPath**. The Vite dev server
-proxies `/api` and `/auth` to the backend on http://localhost:3001, so the app
-stays same-origin (needed for the session cookie and OAuth redirect).
-=======
-# uipath-process-runner
->>>>>>> d5b35ed256fb607d301b7ef04c0a500f302b9b1c
+Open http://localhost:3000 and click **Login with UiPath**.

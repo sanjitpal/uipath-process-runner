@@ -9,7 +9,7 @@ import {
 } from './services/uiPathApi';
 import { getMe, logout } from './services/authApi';
 import LoginScreen from './components/LoginScreen';
-import FullNameForm from './components/FullNameForm';
+import TuwaiqCallRecordForm from './components/TuwaiqCallRecordForm';
 import './App.css';
 
 
@@ -38,22 +38,6 @@ const durationStr = (start, end) => {
   if (m) return `${m}m ${s}s`;
   return `${s}s`;
 };
-
-// OutputArguments comes back as a JSON string; turn it into [key, value] pairs.
-const parseArgs = (raw) => {
-  if (!raw) return [];
-  try {
-    const obj = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    return Object.entries(obj || {});
-  } catch {
-    return [];
-  }
-};
-
-const renderValue = (value) =>
-  value !== null && typeof value === 'object'
-    ? JSON.stringify(value, null, 2)
-    : String(value);
 
 // --- section 2 card --------------------------------------------------------
 function ActiveJobCard({ job, onStop, stopping }) {
@@ -100,7 +84,6 @@ function ActiveJobCard({ job, onStop, stopping }) {
 
 // --- section 3 card --------------------------------------------------------
 function OutputCard({ job }) {
-  const args = parseArgs(job.OutputArguments);
   const isStopped = job.State === 'Stopped';
   const cardClass = isStopped ? 'job-card is-stopped' : 'job-card is-success';
   const badgeClass = isStopped ? 'badge badge-secondary' : 'badge badge-success';
@@ -122,22 +105,6 @@ function OutputCard({ job }) {
           <span className="k">Duration</span>
           <span className="v">{durationStr(job.StartTime, job.EndTime)}</span>
         </div>
-      </div>
-
-      <div className="output-block">
-        <div className="output-title">Output</div>
-        {args.length === 0 ? (
-          <div className="output-empty">No output arguments returned.</div>
-        ) : (
-          <dl className="output-list">
-            {args.map(([key, value]) => (
-              <div className="output-row" key={key}>
-                <dt>{key}</dt>
-                <dd>{renderValue(value)}</dd>
-              </div>
-            ))}
-          </dl>
-        )}
       </div>
     </div>
   );
@@ -161,6 +128,7 @@ function App() {
 
     // FullName form state
   const [selectedProcessKey, setSelectedProcessKey] = useState('');
+  const [activeTab, setActiveTab] = useState('form'); // 'form' | 'dashboard' | 'both'
 
   const [activeJobs, setActiveJobs] = useState([]);
   const [completedJobs, setCompletedJobs] = useState([]);
@@ -184,9 +152,9 @@ function App() {
     return false;
   }, []);
 
-  // Check the session once on load.
+  // Check the session once on load, and listen for popup OAuth message.
   useEffect(() => {
-    (async () => {
+    const checkSession = async () => {
       try {
         const me = await getMe();
         if (me.authenticated) {
@@ -199,7 +167,40 @@ function App() {
       } catch {
         setAuthStatus('anon');
       }
-    })();
+    };
+
+    checkSession();
+
+    const handleMessage = (event) => {
+      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
+        if (event.data.authToken) {
+          try {
+            localStorage.setItem('uipath_auth_token', event.data.authToken);
+          } catch {}
+        }
+        checkSession();
+      }
+    };
+
+    const handleStorage = (event) => {
+      if (event.key === 'uipath_auth_token' && event.newValue) {
+        checkSession();
+      }
+    };
+
+    const handleFocus = () => {
+      checkSession();
+    };
+
+    window.addEventListener('message', handleMessage);
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   // Once authenticated, load the user's folders and default to the first one.
@@ -254,7 +255,7 @@ function App() {
       if (handleAuthError(err)) return;
       setJobsError(
         err.response?.data?.error ||
-          'Could not reach the backend server on port 3001.'
+          'Could not reach the backend server.'
       );
     }
   }, [selectedFolderId, handleAuthError]);
@@ -334,10 +335,10 @@ function App() {
     <div className="app-shell">
       <header className="app-header">
         <div className="brand">
-          <span className="brand-mark">◆</span>
+          <span className="brand-mark">🏢</span>
           <div>
-            <h1>UiPath Process Runner</h1>
-            <p>{org ? `Orchestrator · ${org}` : 'Trigger and monitor your automations'}</p>
+            <h1>Tuwaiq Call Center CRM</h1>
+            <p>{org ? `UiPath Unattended Integration · ${org}` : 'Call Record Management & Automation'}</p>
           </div>
         </div>
 
@@ -374,10 +375,42 @@ function App() {
         </div>
       </header>
 
-      <div className="sub-status">
-        <div className={`status-pill ${jobsError ? 'is-down' : 'is-live'}`}>
-          <span className="status-dot" />
-          {jobsError ? 'Disconnected' : `Live · updated ${fmtTime(lastUpdated)}`}
+      {/* View Switcher Tabs & Live Status Bar */}
+      <div className="view-nav-wrapper">
+        <div className="view-tabs">
+          <button
+            type="button"
+            className={`view-tab-btn ${activeTab === 'form' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('form')}
+          >
+            <span>📋</span>
+            <span>Call Record Form</span>
+          </button>
+
+          <button
+            type="button"
+            className={`view-tab-btn ${activeTab === 'dashboard' ? 'is-active' : ''}`}
+            onClick={() => setActiveTab('dashboard')}
+          >
+            <span>📊</span>
+            <span>Orchestrator Dashboard</span>
+            {activeJobs.length > 0 ? (
+              <span className="tab-badge badge-active">
+                <span className="tab-badge-pulse" /> {activeJobs.length} running
+              </span>
+            ) : completedJobs.length > 0 ? (
+              <span className="tab-badge">
+                {completedJobs.length} done
+              </span>
+            ) : null}
+          </button>
+        </div>
+
+        <div className="sub-status" style={{ margin: 0 }}>
+          <div className={`status-pill ${jobsError ? 'is-down' : 'is-live'}`}>
+            <span className="status-dot" />
+            {jobsError ? 'Disconnected' : `Live · updated ${fmtTime(lastUpdated)}`}
+          </div>
         </div>
       </div>
 
@@ -385,130 +418,154 @@ function App() {
       {foldersError && <div className="banner banner-error">{foldersError}</div>}
       {jobsError && <div className="banner banner-error">{jobsError}</div>}
 
-      {/* Section 1 --------------------------------------------------------- */}
-      <section className="panel">
-        <div className="panel-head">
-          <h2>
-            <span className="idx">1</span> Available Processes
-          </h2>
-          <div className="panel-actions">
-            <span className="count">{processes.length}</span>
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={loadProcesses}
-              disabled={loadingProcesses}
-            >
-              ↻ Refresh
-            </button>
-          </div>
-        </div>
+      {/* Main Form: Tuwaiq Call Record Form */}
+      {activeTab === 'form' && (
+        <TuwaiqCallRecordForm
+          selectedProcessKey={selectedProcessKey}
+          onSelectProcessKey={setSelectedProcessKey}
+          processes={processes}
+          loadingProcesses={loadingProcesses}
+          processesError={processesError}
+          onRefreshProcesses={loadProcesses}
+          folderId={selectedFolderId}
+          onJobUpdate={loadJobs}
+          onViewDashboard={() => setActiveTab('dashboard')}
+        />
+      )}
 
-        {processesError ? (
-          <div className="banner banner-error">{processesError}</div>
-        ) : loadingProcesses ? (
-          <div className="muted">Loading processes…</div>
-        ) : processes.length === 0 ? (
-          <div className="empty">No processes are assigned to this folder.</div>
-        ) : (
-          <div className="process-grid">
-            {processes.map((proc) => (
-              <div className="process-card" key={proc.Key}>
-                <div className="process-body">
-                  <div className="process-name">{proc.Name}</div>
-                  {proc.Description && (
-                    <div className="process-desc">{proc.Description}</div>
-                  )}
-                  <div className="process-meta">v{proc.ProcessVersion}</div>
+      {/* Orchestrator Dashboard: Available Processes, Running Jobs & Completed Outputs */}
+      {activeTab === 'dashboard' && (
+        <div className="orchestrator-dashboard-view" style={{ marginTop: '0.5rem' }}>
+          {/* Quick Metrics KPI Bar */}
+          <div className="dashboard-summary-bar">
+            <div className="summary-card">
+              <div>
+                <div className="summary-card-val">{processes.length}</div>
+                <div className="summary-card-lbl">Available Processes in Folder</div>
+              </div>
+              <span style={{ fontSize: '24px' }}>⚡</span>
+            </div>
+            <div className="summary-card">
+              <div>
+                <div className="summary-card-val" style={{ color: activeJobs.length > 0 ? 'var(--primary)' : 'inherit' }}>
+                  {activeJobs.length}
                 </div>
+                <div className="summary-card-lbl">Running &amp; Pending Jobs</div>
+              </div>
+              <span style={{ fontSize: '24px' }}>🤖</span>
+            </div>
+            <div className="summary-card">
+              <div>
+                <div className="summary-card-val" style={{ color: completedJobs.length > 0 ? 'var(--success)' : 'inherit' }}>
+                  {completedJobs.length}
+                </div>
+                <div className="summary-card-lbl">Completed Today</div>
+              </div>
+              <span style={{ fontSize: '24px' }}>✓</span>
+            </div>
+          </div>
+
+          {/* Section 1: Available Processes in Folder */}
+          <section className="panel">
+            <div className="panel-head">
+              <h2>
+                <span className="idx">1</span> Available Processes in Folder
+              </h2>
+              <div className="panel-actions">
+                <span className="count">{processes.length}</span>
                 <button
-                  className="btn btn-primary"
-                  onClick={() => handleRun(proc)}
-                  disabled={startingKey === proc.Key}
+                  className="btn btn-ghost btn-sm"
+                  onClick={loadProcesses}
+                  disabled={loadingProcesses}
+                  title="Reload processes from Orchestrator"
                 >
-                  {startingKey === proc.Key ? 'Starting…' : '▶ Run'}
+                  ↻ Refresh
                 </button>
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            </div>
 
-      {/* Section 2 --------------------------------------------------------- */}
-      <section className="panel">
-        <div className="panel-head">
-          <h2>
-            <span className="idx">2</span> Running &amp; Pending
-          </h2>
-          <span className="count">{activeJobs.length}</span>
+            {processesError ? (
+              <div className="banner banner-error">{processesError}</div>
+            ) : loadingProcesses ? (
+              <div className="muted">Loading processes from folder…</div>
+            ) : processes.length === 0 ? (
+              <div className="empty">No processes are assigned to this folder.</div>
+            ) : (
+              <div className="process-grid">
+                {processes.map((proc) => (
+                  <div className="process-card" key={proc.Key}>
+                    <div className="process-body">
+                      <div className="process-name">{proc.Name}</div>
+                      {proc.Description && (
+                        <div className="process-desc">{proc.Description}</div>
+                      )}
+                      <div className="process-meta">v{proc.ProcessVersion || '1.0'}</div>
+                    </div>
+                    <div className="process-card-actions">
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => handleRun(proc)}
+                        disabled={startingKey === proc.Key}
+                        title="Start unattended job directly in Orchestrator"
+                      >
+                        {startingKey === proc.Key ? 'Starting…' : '▶ Run'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Section 2: Running & Pending Unattended Jobs */}
+          <section className="panel">
+            <div className="panel-head">
+              <h2>
+                <span className="idx">2</span> Running &amp; Pending Jobs
+              </h2>
+              <span className="count">{activeJobs.length}</span>
+            </div>
+
+            {activeJobs.length === 0 ? (
+              <div className="empty">Nothing running right now in this folder.</div>
+            ) : (
+              <div className="job-grid">
+                {activeJobs.map((job) => (
+                  <ActiveJobCard
+                    key={job.Id}
+                    job={job}
+                    onStop={handleStop}
+                    stopping={stoppingId === job.Id}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Section 3: Completed Today */}
+          <section className="panel">
+            <div className="panel-head">
+              <h2>
+                <span className="idx">3</span> Completed Today
+              </h2>
+              <span className="count">{completedJobs.length}</span>
+            </div>
+
+            {completedJobs.length === 0 ? (
+              <div className="empty">No successful unattended runs yet today.</div>
+            ) : (
+              <div className="job-grid">
+                {completedJobs.map((job) => (
+                  <OutputCard key={job.Id} job={job} />
+                ))}
+              </div>
+            )}
+          </section>
         </div>
-
-        {activeJobs.length === 0 ? (
-          <div className="empty">Nothing running right now.</div>
-        ) : (
-          <div className="job-grid">
-            {activeJobs.map((job) => (
-              <ActiveJobCard
-                key={job.Id}
-                job={job}
-                onStop={handleStop}
-                stopping={stoppingId === job.Id}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Section 3 --------------------------------------------------------- */}
-      <section className="panel">
-        <div className="panel-head">
-          <h2>
-            <span className="idx">3</span> Completed Today · Output
-          </h2>
-          <span className="count">{completedJobs.length}</span>
-        </div>
-
-        {completedJobs.length === 0 ? (
-          <div className="empty">No successful runs yet today.</div>
-        ) : (
-          <div className="job-grid">
-            {completedJobs.map((job) => (
-              <OutputCard key={job.Id} job={job} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      
-      {/* Section 4: FullName Form ------------------------------------------- */}
-      <section className="panel">
-        <FullNameForm
-          releaseKey={selectedProcessKey}
-          folderId={selectedFolderId}
-        />
-
-        <div className="form-process-selector">
-          <label htmlFor="processSelect">Select Process (Release Key):</label>
-          <select
-            id="processSelect"
-            value={selectedProcessKey}
-            onChange={(e) => setSelectedProcessKey(e.target.value)}
-            disabled={processes.length === 0}
-          >
-            <option value="">-- Select a process --</option>
-            {processes.map((proc) => (
-              <option key={proc.Key} value={proc.Key}>
-                {proc.Name} ({proc.Key})
-              </option>
-            ))}
-          </select>
-          {processes.length === 0 && (
-            <p className="muted">No processes available. Select a folder with processes.</p>
-          )}
-        </div>
-      </section>
+      )}
 
       <footer className="app-footer">
-        Auto-refreshing every {POLL_INTERVAL / 1000}s · backend proxy on port 3001
+        Tuwaiq Call Center CRM · Orchestrator auto-refreshing every {POLL_INTERVAL / 1000}s
       </footer>
     </div>
   );

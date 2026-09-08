@@ -4,9 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node server.js",
     "build": "vite build",
-    "preview": "vite preview",
+    "preview": "node server.js",
+    "start": "node server.js",
     "server": "node server.js"
   },
   "dependencies": {

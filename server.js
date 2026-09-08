@@ -4,16 +4,21 @@
 import 'dotenv/config';
 import express from 'express';
 import axios from 'axios';
+import path from 'path';
+import { createServer as createViteServer } from 'vite';
 
 import {
   sessionMiddleware,
   authRouter,
   requireAuth,
   authConfig,
+  getRedirectUri,
 } from './auth.js';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = 3000;
+
+app.set('trust proxy', 1);
 
 const { VITE_UIPATH_TENANT_URL, VITE_UIPATH_ORG_UNIT_ID } = process.env;
 
@@ -182,7 +187,7 @@ app.post('/api/uipath/start-job-with-args', requireAuth, async (req, res) => {
 app.get('/api/uipath/jobs/:jobId', requireAuth, async (req, res) => {
   try {
     const { jobId } = req.params;
-    const url = `${VITE_UIPATH_TENANT_URL}/odata/Jobs(${jobId})?$select=Id,State,StartTime,EndTime,OutputArguments`;
+    const url = `${VITE_UIPATH_TENANT_URL}/odata/Jobs(${jobId})?$select=Id,State,StartTime,EndTime,OutputArguments,Info`;
     const { data } = await orchestrator(req, { method: 'get', url });
     res.json(data);
   } catch (error) {
@@ -190,12 +195,34 @@ app.get('/api/uipath/jobs/:jobId', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/api/health', (_req, res) =>
-  res.json({ ok: true, org: authConfig.org, tenant: authConfig.tenant, scope: authConfig.SCOPE })
+app.get('/api/health', (req, res) =>
+  res.json({
+    ok: true,
+    org: authConfig.org,
+    tenant: authConfig.tenant,
+    scope: authConfig.SCOPE,
+    redirectUri: getRedirectUri(req),
+  })
 );
 
-app.listen(PORT, () => {
-  console.log(`🚀 Backend proxy server running on http://localhost:${PORT}`);
-  console.log(`   Org: ${authConfig.org}  Tenant: ${authConfig.tenant}`);
+// Mount Vite middleware in development or serve static build in production
+if (process.env.NODE_ENV !== 'production') {
+  const vite = await createViteServer({
+    server: { middlewareMode: true },
+    appType: 'spa',
+  });
+  app.use(vite.middlewares);
+} else {
+  const distPath = path.join(process.cwd(), 'dist');
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
+  console.log(`   Org: ${authConfig.org || '(not configured)'}  Tenant: ${authConfig.tenant || '(not configured)'}`);
   console.log(`   Authorize: ${authConfig.AUTHORIZE_URL}`);
+  console.log(`   Redirect URI: ${authConfig.REDIRECT_URI}`);
 });

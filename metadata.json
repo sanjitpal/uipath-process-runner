@@ -1,0 +1,8 @@
+{
+  "name": "Tuwaiq - Call Record Form",
+  "description": "Call center CRM record form integrated with UiPath unattended automation for customer services.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
